@@ -59,11 +59,6 @@ SCRIPT_NAME="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 #   Dependencies
 # -----------------------------------------------------------------------------
 
-if [[ "$EUID" -ne "0" ]]; then
-  echo "[${red}fail${standout}] Please run as root or with sudo."
-  exit 1
-fi
-
 if ! command -v jq &> /dev/null ; then 
   echo "[${red}fail${standout}] The jq program must be installed."
   exit 1
@@ -205,6 +200,13 @@ if [[ ! -f "${SERVER_KEY_FILE}" ]] ; then
   exit 1
 fi
 
+if [[ "$EUID" -ne "0" ]]; then
+  PERMISSION=$(stat -c "%a" "${SERVER_KEY_FILE}")
+  if [[ "${PERMISSION:1:2}" != "00" ]] ; then 
+    echo "[${red}fail${standout}] Permissions ${PERMISSION} for '${SERVER_KEY_FILE}' are too open (group and other needs to be 0)"
+    exit 1
+  fi
+fi
 
 # -----------------------------------------------------------------------------
 #   Input parameters
