@@ -2,7 +2,7 @@
 * text=auto
 
 # Set the default end-of-line character under Linux.
-* linux=lf 
+* eol=lf
 
 # A bash and shell script requires the Linux end-of-line character.
-*.sh linux
+*.sh eol=lf

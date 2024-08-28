@@ -2,12 +2,13 @@
 
 # Needs "jq" locally, `sudo apt install jq`
 # Needs "openssl" locally, `sudo apt install openssl`
-# Needs "ssh-agent" locally, `sudo apt install ssh`
+# Needs "ssh" locally, `sudo apt install ssh`
 
 # Needs "tar" on server
 # Needs "rsync" on server
 
 # -----------------------------------------------------------------------------
+# To test this script you can use docker
 
 ## syntax=docker/dockerfile:1
 #FROM ubuntu:latest
@@ -21,6 +22,8 @@
 ## docker build -t test_image .
 ## docker run -it --mount type=bind,source="$(pwd)"/mount,target=/mount --name test_container test_image sh
 
+# -----------------------------------------------------------------------------
+#   Basic
 # -----------------------------------------------------------------------------
 
 # Change standard echo function
@@ -49,6 +52,18 @@ if test -t 1; then
   fi
 fi
 
+SCRIPT_NAME="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
+
+
+# -----------------------------------------------------------------------------
+#   Dependencies
+# -----------------------------------------------------------------------------
+
+if [[ "$EUID" -ne "0" ]]; then
+  echo "[${red}fail${standout}] Please run as root or with sudo."
+  exit 1
+fi
+
 if ! command -v jq &> /dev/null ; then 
   echo "[${red}fail${standout}] The jq program must be installed."
   exit 1
@@ -59,10 +74,61 @@ if ! command -v openssl &> /dev/null ; then
   exit 1
 fi
 
-if ! command -v ssh-agent &> /dev/null ; then 
+if ! command -v ssh &> /dev/null ; then 
   echo "[${red}fail${standout}] The ssh program must be installed."
   exit 1
 fi
+
+
+# -----------------------------------------------------------------------------
+#   Functions
+# -----------------------------------------------------------------------------
+
+# usage: fingerprint [-i identity_file]
+#                    [-p port]
+#                    destination
+function fingerprint() {
+  local PORT=22
+  local KEYFILE=""
+  local DESTINATION=""
+  while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
+    -i | --identity_file )
+      shift; KEYFILE="$1"
+      ;;
+    -p | --port )
+      shift; PORT="$1"
+      ;;
+  esac; shift; done
+  DESTINATION="$1"
+
+  local OUTPUT=$({ { sleep 1; echo ""; } | script -q /dev/null -c "ssh -i ${KEYFILE} -p ${PORT} ${DESTINATION} exit ; " ; })
+  if [[ "" == "${OUTPUT}" ]] ; then
+    # You have already accepted the fingerprint
+    echo "PASS"
+    return 0;
+    :;
+  else
+    local LINE=$(echo "$OUTPUT" | grep "SHA256")
+    if [[ "" == "${LINE}" ]] ; then
+      local LINE=$(echo "$OUTPUT" | grep "Enter passphrase for key")
+      if [[ "" == "${LINE}" ]] ; then
+        # ERROR
+        echo "ERROR"
+        return 1;
+        :;
+      else
+        # You have already accepted the fingerprint
+        echo "PASS"
+       return 0;
+        :;
+      fi
+    else
+      local FINGERPRINT=$(echo ${LINE#*SHA256:} | sed 's/\..*//')
+      echo "$FINGERPRINT"
+      return 0;
+    fi
+  fi
+}
 
 
 # -----------------------------------------------------------------------------
@@ -87,11 +153,6 @@ SERVER_PORT=$(jq -r " .server.port " "${CONFIG}")
 
 # Path and name of the private key
 SERVER_KEY_FILE=$(jq -r " .server.key.file " "${CONFIG}")
-
-if [[ ! -f "${SERVER_KEY_FILE}" ]] ; then 
-  echo "[${red}fail${standout}] A \"${SERVER_KEY_FILE}\" key file is necessary." 
-  exit 1
-fi
 
 # Passwort for the private key file (not recommended in terms of security)
 SERVER_KEY_PASSWORD=$(jq -r " .server.key.password " "${CONFIG}")
@@ -137,54 +198,155 @@ LOG_LOCAL=$(echo "${BACKUP_LOCAL_DESTINATIONFOLDER}/${BACKUP_NAME}.log" | tr -s 
 
 
 # -----------------------------------------------------------------------------
+# Validity check of the variables
+
+if [[ ! -f "${SERVER_KEY_FILE}" ]] ; then 
+  echo "[${red}fail${standout}] A \"${SERVER_KEY_FILE}\" key file is necessary." 
+  exit 1
+fi
+
+
+# -----------------------------------------------------------------------------
+#   Input parameters
+# -----------------------------------------------------------------------------
 
 while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
   -h | --help )
-	_h=true
+    _h=true
     ;;
   -t | --test )
-	_t=true
+    _t=true
+    ;;
+  --init )
+    _init=true
+    ;;
+  --interactive )
+    _interactive=true
     ;;
   -p | --password )
     shift; SERVER_KEY_PASSWORD=$1
     ;;
 esac; shift; done
 
+
+# -----------------------------------------------------------------------------
+# Performing special tasks
+
 if [[ "true" == "$_h" ]] ; then
-  echo "parameter h/help to show the help (this output)"
-  echo "parameter p/password to set the private key password"
+  echo "usage: ${SCRIPT_NAME} [-h help] [-t test] [init] [interactive] [-p password]"
+  echo ""
+  echo "help:        Shows the help (this output)"
+  echo "test:        To test the password and the fingerprint. Returns 0=No error/1=Error"
+  echo "init:        Accepts the fingerprint. Returns 0=No error/1=Error"
+  echo "interactive: If no password is set, you will be asked for the password."
+  echo "password:    Sets and overwrites the password of the private key,"
+  echo "             note that a password entered here is saved in the history."
+  echo "             Use the config file (${CONFIG})."
   exit 0
 fi
 
 if [[ "true" == "$_t" ]] ; then
-  if openssl rsa -noout -in "${SERVER_KEY_FILE}" -passin "pass:${SERVER_KEY_PASSWORD}" 2>/dev/null; then
-    echo "[${green}pass${standout}] Password matches"
+  ERROR=0
+  
+  if [[ "" != "${SERVER_KEY_PASSWORD}" ]] ; then
+    if openssl rsa -noout -in "${SERVER_KEY_FILE}" -passin "pass:${SERVER_KEY_PASSWORD}" 2>/dev/null; then
+      echo "[${green}pass${standout}] Password matches"
+    else
+      echo "[${red}fail${standout}] Password does not match."
+      ERROR=1
+    fi
   else
-    echo "[${red}fail${standout}] Password does not match"
+    echo "[${red}fail${standout}] No password available."
+    ERROR=1
+  fi 
+  
+  RESULT=$(fingerprint -i "${SERVER_KEY_FILE}" -p ${SERVER_PORT} ${SERVER_USER}@${SERVER_IP})
+  if [[ "ERROR" == "${RESULT}" ]] ; then
+    echo "[${red}fail${standout}] There is a connection problem."
+    ERROR=1
+  elif [[ "" == "${RESULT}" ]] ; then
+    echo "[${red}fail${standout}] This logical error should not occur."
+    ERROR=1
+  elif [[ "PASS" == "${RESULT}" ]] ; then
+    echo "[${green}pass${standout}] You can connect to the server."
+  else
+    echo "[${red}fail${standout}] You need to accept the fingerprint"
+    echo "       ${RESULT}"
+    ERROR=1
   fi
-  exit 0
+  
+  exit ${ERROR}
+fi
+
+if [[ "true" == "$_init" ]] ; then
+  RESULT=$(fingerprint -i "${SERVER_KEY_FILE}" -p ${SERVER_PORT} ${SERVER_USER}@${SERVER_IP})
+  if [[ "ERROR" == "${RESULT}" ]] ; then
+    echo "[${red}fail${standout}] There is a connection problem."
+    exit 1
+  elif [[ "" == "${RESULT}" ]] ; then
+    echo "[${red}fail${standout}] This logical error should not occur."
+    exit 1
+  elif [[ "PASS" == "${RESULT}" ]] ; then
+    echo "[${green}pass${standout}] You can connect to the server, init was not necessary."
+    exit 0
+  else
+    echo "[${green}pass${standout}] You have accepted the fingerprint, ${SERVER_USER}@${SERVER_IP}"
+    echo "       ${RESULT}"
+    ssh -o BatchMode=yes -o StrictHostKeyChecking=no -i "${SERVER_KEY_FILE}" -p ${SERVER_PORT} ${SERVER_USER}@${SERVER_IP} exit &> /dev/null;
+    exit 0
+  fi
+  
+  exit 1
 fi
 
 
 # -----------------------------------------------------------------------------
+#   Test settings and connection
+# -----------------------------------------------------------------------------
 
-# Add password of private key file 
-# 
+# If the password is blank, you must enter it manually
 if [[ "" == "${SERVER_KEY_PASSWORD}" ]] ; then
-  # If the password is blank, you must enter it manually
-  eval "$(ssh-agent -s)"
-  ssh-add "${SERVER_KEY_FILE}"
-else
-  if openssl rsa -noout -in "${SERVER_KEY_FILE}" -passin "pass:${SERVER_KEY_PASSWORD}" 2>/dev/null ; then
-    eval "$(ssh-agent -s >/dev/null 2>&1)"
-    { sleep 1; echo "${SERVER_KEY_PASSWORD}"; } | script -q /dev/null -c "ssh-add \"${SERVER_KEY_FILE}\" >/dev/null 2>&1" >/dev/null 2>&1;
+  if [[ "true" == "$_interactive" ]] ; then
+    read -sp "Enter passphrase for ${SERVER_KEY_FILE}:" SERVER_KEY_PASSWORD
+    echo ""
   else
-    echo "[${red}fail${standout}] The password is wrong."
+    echo "[${red}fail${standout}] No password available."
     exit 1;
   fi
 fi
 
+if ! openssl rsa -noout -in "${SERVER_KEY_FILE}" -passin "pass:${SERVER_KEY_PASSWORD}" 2>/dev/null ; then
+  echo "[${red}fail${standout}] The password is wrong."
+  exit 1;
+fi
 
+RESULT=$(fingerprint -i "${SERVER_KEY_FILE}" -p ${SERVER_PORT} ${SERVER_USER}@${SERVER_IP})
+if [[ "ERROR" == "${RESULT}" ]] ; then
+  echo "[${red}fail${standout}] There is a connection problem."
+  exit 1
+elif [[ "" == "${RESULT}" ]] ; then
+  echo "[${red}fail${standout}] This logical error should not occur."
+  exit 1
+elif [[ "PASS" == "${RESULT}" ]] ; then
+  :;
+else
+  echo "[${red}fail${standout}] You need to accept the fingerprint"
+  echo "       ${RESULT}"
+  exit 1
+fi
+
+#REMOTE_COMMANDS_TEST=$(cat << END_REMOTE_COMMANDS_TEST
+#  echo "yes" > test.test
+#END_REMOTE_COMMANDS_TEST
+#)
+#
+#{ sleep 1; echo "${SERVER_KEY_PASSWORD}"; } | script -q /dev/null -c "ssh -i ${SERVER_KEY_FILE} -p ${SERVER_PORT} ${SERVER_USER}@${SERVER_IP} \"${REMOTE_COMMANDS_TEST}\" ; " ;
+
+echo "end test"
+exit 1
+
+# -----------------------------------------------------------------------------
+#   Backup
 # -----------------------------------------------------------------------------
 
 # Remote commands section
@@ -219,8 +381,8 @@ else
 
   # Stop the container
   if [[ "\$( docker container inspect -f '{{.State.Running}}' \${CONTAINER} )" == "true" ]] ; then 
-	echo "\$(date '+%H:%M:%S') docker stop \${CONTAINER}"
-	echo "\$(date '+%H:%M:%S') docker stop \${CONTAINER}" >> "${LOG_SERVER}"
+    echo "\$(date '+%H:%M:%S') docker stop \${CONTAINER}"
+    echo "\$(date '+%H:%M:%S') docker stop \${CONTAINER}" >> "${LOG_SERVER}"
     docker stop \${CONTAINER}
   fi
 
