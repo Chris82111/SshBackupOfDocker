@@ -181,8 +181,8 @@ function is_fingerprint_accepted() {
   if [[ "" != "${DESTINATION}" ]] ; then
     local ARR
     IFS='@'; ARR=($DESTINATION); unset IFS;
-	USER="${ARR[0]}"
-	HOST="${ARR[1]}"
+    USER="${ARR[0]}"
+    HOST="${ARR[1]}"
   fi
   
   OUTPUT=$(ssh -o ConnectTimeout=3 -o BatchMode=yes -i "${KEYFILE}" -p "${PORT}" "${USER}@${HOST}" exit 2>&1 )
@@ -193,7 +193,7 @@ function is_fingerprint_accepted() {
   
   IFS=$'\n'; ARR=($OUTPUT); unset IFS;
   OUTPUT="${ARR[0]}"
-	
+    
   if [[ "0" == "${RETURN_VALUE}" ]] ; then
     # You have already accepted the fingerprint
     echo "PASS"
@@ -205,30 +205,30 @@ function is_fingerprint_accepted() {
       echo "FAIL-FINGERPRINT"
       return 1;
     elif [[ "${OUTPUT}" == "${USER}@${HOST}: Permission denied (publickey)." ]] ; then
-	  # Fingerprint is accepted, but an encrypted certificate file was used.
+      # Fingerprint is accepted, but an encrypted certificate file was used.
       echo "PASS-ENCRYPTED"
       return 0;
     elif [[ "${OUTPUT}" == "ssh: connect to host ${HOST} port ${PORT}: Connection refused" ]] ; then
-	  # Wrong IP or wrong host
+      # Wrong IP or wrong host
       echo "FAIL-IP"
       return 2;
     elif [[ "${OUTPUT}" == "ssh: connect to host ${HOST} port ${PORT}: Connection timed out" ]] ; then
-	  # Wrong port on the server, because wrong port is used, or wrong server with different port, or timeout
+      # Wrong port on the server, because wrong port is used, or wrong server with different port, or timeout
       echo "FAIL-PORT"
       return 3;
     elif [[ "${OUTPUT}" == "ssh: Could not resolve hostname ${HOST,,}: Name or service not known" ]] ; then
-	  # Incorrect host name 
+      # Incorrect host name 
       echo "FAIL-HOST"
       return 4;
     elif [[ "${OUTPUT}" == "Warning: Identity file  not accessible: No such file or directory." ]] ; then
-	  # Identity file is empty or was not found
+      # Identity file is empty or was not found
       echo "FAIL-IDENTITY"
       return 5;
-	else
+    else
       # Unknown error
       echo "FAIL-254"
       return 254;
-	fi
+    fi
   else
     # Unknown error
     echo "FAIL-255"
@@ -275,21 +275,21 @@ function is_fingerprint_confirmation_required() {
   if [[ "" != "${DESTINATION}" ]] ; then
     local ARR
     IFS='@'; ARR=($DESTINATION); unset IFS;
-	USER="${ARR[0]}"
-	HOST="${ARR[1]}"
+    USER="${ARR[0]}"
+    HOST="${ARR[1]}"
   fi
   
   OUTPUT=$(is_fingerprint_accepted -i "${KEYFILE}" -p "${PORT}" -u "${USER}" -h "${HOST}" "${DESTINATION}" )
   OUTPUT_4CHARACTERS="${OUTPUT:0:4}"
   if [[ "PASS" == "${OUTPUT_4CHARACTERS}" ]] ; then
     echo "NO";
-	return 1;
+    return 1;
   elif [[ "FAIL-FINGERPRINT" == "${OUTPUT}" ]] ; then
     echo "YES";
-	return 0;
+    return 0;
   else
     echo "ERROR";
-	return 255;
+    return 255;
   fi
 }
 
@@ -326,8 +326,8 @@ function fingerprint_dialog() {
   if [[ "" != "${DESTINATION}" ]] ; then
     local ARR
     IFS='@'; ARR=($DESTINATION); unset IFS;
-	USER="${ARR[0]}"
-	HOST="${ARR[1]}"
+    USER="${ARR[0]}"
+    HOST="${ARR[1]}"
   fi
   
   ssh -o ConnectTimeout=3 -i "${KEYFILE}" -p "${PORT}" "${USER}@${HOST}" exit
@@ -478,8 +478,8 @@ if [[ "true" == "$_init" ]] ; then
     echo "[${red}fail${standout}] There is a connection problem."
     exit 1
   elif [[ "YES" == "${RESULT}" ]] ; then
-	fingerprint_dialog -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}"
-	exit 0
+    fingerprint_dialog -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}"
+    exit 0
   elif [[ "NO" == "${RESULT}" ]] ; then
     echo "[${green}pass${standout}] You can connect to the server, init was not necessary."
     exit 0
@@ -541,6 +541,7 @@ fi
 #ssh -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}"
 echo "end test"
 exit 1
+
 
 # -----------------------------------------------------------------------------
 #   Backup
