@@ -53,13 +53,16 @@ while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
   -l | --login )
     _login=true
     ;;
+  -s | --scan )
+    _scan=true
+    ;;
   -p | --password )
     shift; SERVER_KEY_PASSWORD_OVERWRITE=$1
     ;;
 esac; shift; done
 
 function cleanup {
-  vecho "Cleanup"
+  vecho "Cleanup" 2> /dev/null
   shred -u "${TEMP_KEY}" 2> /dev/null
 }
 
@@ -75,6 +78,7 @@ if [[ "true" == "$_h" ]] ; then
   echo "interactive: If no password is set, you will be asked for the password."
   echo "remove:      Removes the server's fingerprint from your computer."
   echo "login:       Uses the data from the config file to log in to the server."
+  echo "scan:        Scan the server and determine the fingerprint."
   echo "password:    Sets and overwrites the password of the private key,"
   echo "             note that a password entered here is saved in the history."
   echo "             Use the config file (${CONFIG})."
@@ -82,6 +86,7 @@ if [[ "true" == "$_h" ]] ; then
   echo "Set rights:  'chmod 600 example.file'"
   echo "Set rights:  'chown root example.file'"
   echo "Set rights:  'chgrp root example.file'"
+  echo ""
   
   exit 0
 fi
@@ -504,6 +509,14 @@ if [[ "true" == "$_remove" ]] ; then
   vecho "Removing the host key of ${SERVER_IP}."
   ssh-keygen -R "${SERVER_IP}"  
   exit 1
+fi
+
+if [[ "true" == "$_scan" ]] ; then
+  dependent_program "ssh-keyscan"
+  dependent_program "ssh-keygen"
+  vecho "Scan server and determine fingerprint"
+  ssh-keyscan "${SERVER_IP}" | ssh-keygen -lf -
+  exit 0
 fi
 
 
