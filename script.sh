@@ -71,7 +71,7 @@ function cleanup {
 trap cleanup EXIT
 
 if [[ "true" == "$_h" ]] ; then
-  echo "usage: ${SCRIPT_NAME} [-h help] [-v verbose] [-t test] [init] [interactive] [-p password]"
+  echo "usage: ${SCRIPT_NAME} [-h help] [-v verbose] [-t test] [init] [interactive] [-r remove] [-l login] [-s scan] [-p password]"
   echo ""
   echo "help:        Shows the help (this output)."
   echo "verbose:     Detailed mode for displaying additional information."
@@ -90,7 +90,8 @@ if [[ "true" == "$_h" ]] ; then
   echo "  'chown root example.file'"
   echo "  'chgrp root example.file'"
   echo ""
-  echo "Create a task in the Synology with the following content:"
+  echo "Create a task in the Synology with the following content."
+  echo "If it works, remove '-t' or replace it with '-v':"
   echo "  /bin/bash -c \"/bin/bash '/volume1/folder/script.sh' '-t' > >(tee '/volume1/folder/log.log') RET_VAL=\$?; exit \$RET_VAL\" "
   echo ""
   echo "Return values:"
@@ -143,7 +144,6 @@ function echo() { builtin echo -e "$@"; }
 function vecho() { if [[ "true" == "$_v" ]] ; then echo "[${cyan}info${normal}] $(date '+%H:%M:%S') $@"; fi ; }
 
 function lecho() { echo "$(date '+%H:%M:%S') $@"; }
-
 
 SCRIPT_NAME="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 
@@ -589,6 +589,7 @@ else
   echo "[${red}fail${normal}] This logical error should not occur."
   exit 12
 fi
+
 
 # -----------------------------------------------------------------------------
 # Performing special tasks
