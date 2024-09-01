@@ -59,7 +59,7 @@ while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
 esac; shift; done
 
 function cleanup {
-  vecho "[${cyan}info${standout}] Cleanup"
+  vecho "[${cyan}info${normal}] Cleanup"
   shred -u "${TEMP_KEY}" 2> /dev/null
 }
 
@@ -73,9 +73,16 @@ if [[ "true" == "$_h" ]] ; then
   echo "test:        To test the password and the fingerprint. Returns 0=No error/1=Error"
   echo "init:        Accepts the fingerprint. Returns 0=No error/1=Error"
   echo "interactive: If no password is set, you will be asked for the password."
+  echo "remove:      Removes the server's fingerprint from your computer."
+  echo "login:       Uses the data from the config file to log in to the server."
   echo "password:    Sets and overwrites the password of the private key,"
   echo "             note that a password entered here is saved in the history."
   echo "             Use the config file (${CONFIG})."
+  echo ""
+  echo "Set rights:  `chmod 600 example.file`"
+  echo "Set rights:  `chown root example.file`"
+  echo "Set rights:  `chgrp root example.file`"
+  
   exit 0
 fi
 
@@ -91,15 +98,9 @@ function vecho() { if [[ "true" == "$_v" ]] ; then echo "$@"; fi ; }
 
 # check if stdout is a terminal
 if test -t 1; then
-
-  # see if it supports colors
-  ncolors=$(tput colors 2> /dev/null)
-
-  if test -n "${ncolors}" && test $ncolors -ge 8; then
     # ANSI escape codes
     bold="\033[1m"
     underline="\033[4m"
-    standout="\033[0m" 
     normal="\033[0m" 
     black="\033[30m"
     red="\033[31m"
@@ -109,7 +110,6 @@ if test -t 1; then
     magenta="\033[1;35m"
     cyan="\033[36m"
     white="\033[1;37m"
-  fi
 fi
 
 SCRIPT_NAME="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
@@ -121,14 +121,14 @@ SCRIPT_NAME="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 
 function dependent_program() {
   if ! command -v "$1" &> /dev/null ; then 
-    echo "[${red}fail${standout}] The $1 program must be installed."
+    echo "[${red}fail${normal}] The $1 program must be installed."
     exit 1
   else 
-    vecho "[${cyan}info${standout}]   $1"
+    vecho "[${cyan}info${normal}]   $1"
   fi
 }
 
-vecho "[${cyan}info${standout}] Programs are installed:"
+vecho "[${cyan}info${normal}] Programs are installed:"
 dependent_program "jq"
 dependent_program "openssl"
 dependent_program "ssh"
@@ -347,9 +347,9 @@ function fingerprint_dialog() {
 
 CONFIG="config.json"
 
-vecho "[${cyan}info${standout}] Your config file is '${CONFIG}'."
+vecho "[${cyan}info${normal}] Your config file is '${CONFIG}'."
 if [[ ! -f "${CONFIG}" ]] ; then 
-  echo "[${red}fail${standout}] A \"${CONFIG}\" config file is necessary."
+  echo "[${red}fail${normal}] A \"${CONFIG}\" config file is necessary."
   exit 1
 fi
 
@@ -411,22 +411,22 @@ LOG_LOCAL=$(echo "${BACKUP_LOCAL_DESTINATIONFOLDER}/${BACKUP_NAME}.log" | tr -s 
 # -----------------------------------------------------------------------------
 # Validity check of the variables
 
-vecho "[${cyan}info${standout}] Your key file is '${SERVER_KEY_FILE}'."
+vecho "[${cyan}info${normal}] Your key file is '${SERVER_KEY_FILE}'."
 if [[ ! -f "${SERVER_KEY_FILE}" ]] ; then 
-  echo "[${red}fail${standout}] A \"${SERVER_KEY_FILE}\" key file is necessary." 
+  echo "[${red}fail${normal}] A \"${SERVER_KEY_FILE}\" key file is necessary." 
   exit 1
 fi
 
 if [[ "" != "${SERVER_KEY_PASSWORD_OVERWRITE}" ]] ; then
-  vecho "[${cyan}info${standout}] Password has been passed and overwrites the one read."
+  vecho "[${cyan}info${normal}] Password has been passed and overwrites the one read."
   SERVER_KEY_PASSWORD="${SERVER_KEY_PASSWORD_OVERWRITE}"
 fi
 
 PERMISSION=$(stat -c "%a" "${SERVER_KEY_FILE}")
-vecho "[${cyan}info${standout}] Permissions is ${PERMISSION} for '${SERVER_KEY_FILE}'."
+vecho "[${cyan}info${normal}] Permissions is ${PERMISSION} for '${SERVER_KEY_FILE}'."
 if [[ "$EUID" -ne "0" ]]; then
   if [[ "${PERMISSION:1:2}" != "00" ]] ; then 
-    echo "[${red}fail${standout}] Permissions ${PERMISSION} for '${SERVER_KEY_FILE}' are too open (group and other needs to be 0)."
+    echo "[${red}fail${normal}] Permissions ${PERMISSION} for '${SERVER_KEY_FILE}' are too open (group and other needs to be 0)."
     exit 1
   fi
 fi
@@ -440,37 +440,37 @@ if [[ "true" == "$_t" ]] ; then
   
   if [[ "" != "${SERVER_KEY_PASSWORD}" ]] ; then
     if openssl rsa -noout -in "${SERVER_KEY_FILE}" -passin "pass:${SERVER_KEY_PASSWORD}" 2>/dev/null; then
-      echo "[${green}pass${standout}] Password matches"
+      echo "[${green}pass${normal}] Password matches"
     else
-      echo "[${red}fail${standout}] Password does not match."
+      echo "[${red}fail${normal}] Password does not match."
       ERROR=1
     fi
   else
-    echo "[${red}fail${standout}] No password available."
+    echo "[${red}fail${normal}] No password available."
     ERROR=1
   fi 
   
   RESULT=$(is_fingerprint_accepted -i "${SERVER_KEY_FILE}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}")
   if [[ "PASS" == "${RESULT}" ]] ; then
-    echo "[${green}pass${standout}] You have already accepted the fingerprint."
+    echo "[${green}pass${normal}] You have already accepted the fingerprint."
   elif [[ "PASS-ENCRYPTED" == "${RESULT}" ]] ; then
-    echo "[${green}pass${standout}] You have already accepted the fingerprint, the certificate file ist encrypted."
+    echo "[${green}pass${normal}] You have already accepted the fingerprint, the certificate file ist encrypted."
   elif [[ "FAIL-FINGERPRINT" == "${RESULT}" ]] ; then
-    echo "[${red}fail${standout}] Fingerprint not accepted."
+    echo "[${red}fail${normal}] Fingerprint not accepted."
   elif [[ "FAIL-IP" == "${RESULT}" ]] ; then
-    echo "[${red}fail${standout}] Wrong IP or wrong host."
+    echo "[${red}fail${normal}] Wrong IP or wrong host."
   elif [[ "FAIL-PORT" == "${RESULT}" ]] ; then
-    echo "[${red}fail${standout}] Wrong port on the server, because wrong port is used, or wrong server with different port, or timeout."
+    echo "[${red}fail${normal}] Wrong port on the server, because wrong port is used, or wrong server with different port, or timeout."
   elif [[ "FAIL-HOST" == "${RESULT}" ]] ; then
-    echo "[${red}fail${standout}] Incorrect host name."
+    echo "[${red}fail${normal}] Incorrect host name."
   elif [[ "FAIL-IDENTITY" == "${RESULT}" ]] ; then
-    echo "[${red}fail${standout}] Identity file is empty or was not found."
+    echo "[${red}fail${normal}] Identity file is empty or was not found."
   elif [[ "FAIL-254" == "${RESULT}" ]] ; then
-    echo "[${red}fail${standout}] Unknown error 254."
+    echo "[${red}fail${normal}] Unknown error 254."
   elif [[ "FAIL-255" == "${RESULT}" ]] ; then
-    echo "[${red}fail${standout}] Unknown error 255."
+    echo "[${red}fail${normal}] Unknown error 255."
   else
-    echo "[${red}fail${standout}] Unknown error."
+    echo "[${red}fail${normal}] Unknown error."
   fi
   
   exit ${ERROR}
@@ -479,16 +479,16 @@ fi
 if [[ "true" == "$_init" ]] ; then
   RESULT=$(is_fingerprint_confirmation_required -i "${SERVER_KEY_FILE}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}")
   if [[ "ERROR" == "${RESULT}" ]] ; then
-    echo "[${red}fail${standout}] There is a connection problem."
+    echo "[${red}fail${normal}] There is a connection problem."
     exit 1
   elif [[ "YES" == "${RESULT}" ]] ; then
     fingerprint_dialog -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}"
     exit 0
   elif [[ "NO" == "${RESULT}" ]] ; then
-    echo "[${green}pass${standout}] You can connect to the server, init was not necessary."
+    echo "[${green}pass${normal}] You can connect to the server, init was not necessary."
     exit 0
   else
-    echo "[${red}fail${standout}] This logical error should not occur."
+    echo "[${red}fail${normal}] This logical error should not occur."
     exit 1
   fi
   
@@ -497,7 +497,7 @@ fi
 
 if [[ "true" == "$_remove" ]] ; then
   dependent_program "ssh-keygen"
-  vecho "[${cyan}info${standout}] Removing the host key of ${SERVER_IP}."
+  vecho "[${cyan}info${normal}] Removing the host key of ${SERVER_IP}."
   ssh-keygen -R "${SERVER_IP}"  
   exit 1
 fi
@@ -509,21 +509,21 @@ fi
 
 # If the password is blank, you must enter it manually
 if [[ "" == "${SERVER_KEY_PASSWORD}" ]] ; then
-  vecho "[${cyan}info${standout}] Password not set."
+  vecho "[${cyan}info${normal}] Password not set."
   if [[ "true" == "$_interactive" ]] ; then
     read -sp "Enter passphrase for ${SERVER_KEY_FILE}:" SERVER_KEY_PASSWORD
     echo ""
   else
-    echo "[${red}fail${standout}] No password available."
+    echo "[${red}fail${normal}] No password available."
     exit 1;
   fi
 fi
 
 if ! openssl rsa -noout -in "${SERVER_KEY_FILE}" -passin "pass:${SERVER_KEY_PASSWORD}" 2>/dev/null ; then
-  echo "[${red}fail${standout}] The password is wrong."
+  echo "[${red}fail${normal}] The password is wrong."
   exit 1;
 else
-  vecho "[${cyan}info${standout}] Password correct."
+  vecho "[${cyan}info${normal}] Password correct."
 fi
 
 # File has 600 permission
@@ -535,16 +535,16 @@ RESULT=$(is_fingerprint_accepted -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_
 RESULT_4CHARACTERS="${RESULT:0:4}"
 
 if [[ "FAIL-FINGERPRINT" == "${RESULT}" ]] ; then
-  echo "[${red}fail${standout}] You need to accept the fingerprint"
+  echo "[${red}fail${normal}] You need to accept the fingerprint"
   exit 1
 elif [[ "FAIL" == "${RESULT_4CHARACTERS}" ]] ; then
-  echo "[${red}fail${standout}] There is a connection problem."
+  echo "[${red}fail${normal}] There is a connection problem."
   exit 1
 elif [[ "PASS" == "${RESULT_4CHARACTERS}" ]] ; then
-  vecho "[${cyan}info${standout}] You accepted the fingerprint."
+  vecho "[${cyan}info${normal}] You accepted the fingerprint."
   :;
 else
-  echo "[${red}fail${standout}] This logical error should not occur."
+  echo "[${red}fail${normal}] This logical error should not occur."
   exit 1
 fi
 
@@ -552,7 +552,7 @@ fi
 # Performing special tasks
 
 if [[ "true" == "$_login" ]] ; then
-  vecho "[${cyan}info${standout}] Log into server."
+  vecho "[${cyan}info${normal}] Log into server."
   ssh -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}"
   exit 1
 fi
