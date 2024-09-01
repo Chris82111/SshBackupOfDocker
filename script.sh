@@ -79,9 +79,9 @@ if [[ "true" == "$_h" ]] ; then
   echo "             note that a password entered here is saved in the history."
   echo "             Use the config file (${CONFIG})."
   echo ""
-  echo "Set rights:  `chmod 600 example.file`"
-  echo "Set rights:  `chown root example.file`"
-  echo "Set rights:  `chgrp root example.file`"
+  echo "Set rights:  'chmod 600 example.file'"
+  echo "Set rights:  'chown root example.file'"
+  echo "Set rights:  'chgrp root example.file'"
   
   exit 0
 fi
