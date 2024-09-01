@@ -31,6 +31,8 @@
 #   Input parameters
 # -----------------------------------------------------------------------------
 
+cd "$(dirname "$0")"
+
 while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
   -h | --help )
     _h=true
@@ -584,8 +586,8 @@ REMOTE_COMMANDS=$(cat << END_REMOTE_COMMANDS
 
 #!/bin/bash
 function echo() { builtin echo -e "\$@"; }
-function vecho() { if [[ "true" == "$_v" ]] ; then echo "[${cyan}info${normal}] \$(date '+%H:%M:%S') \$@"; fi ; }
-function lecho() { echo "\$(date '+%H:%M:%S')  \$@"; }
+function vecho() { if [[ "true" == "$_v" ]] ; then echo "[${yellow}info${normal}] \$(date '+%H:%M:%S') \$@"; fi ; }
+function lecho() { echo "\$(date '+%H:%M:%S') \$@"; }
 
 lecho "Time: \$(date '+y%Ym%md%d %H:%M:%S')" > "${LOG_SERVER}"
 
@@ -705,10 +707,12 @@ if [[ "${SHA256_SERVER[0]}" == "${SHA256_LOCAL[0]}" ]] ; then
   lecho "Data are valid" >> "${LOG_LOCAL}"
   mv "${BACKUP_LOCAL_NAME}" "${BACKUP_LOCAL_NAME_VALID}"
   ssh -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}" "rm ${BACKUP_SERVER_NAME} ; rm ${LOG_SERVER}"
+  exit 0;
 else
   vecho "Data damaged"
   lecho "Data damaged" >> "${LOG_LOCAL}"
   mv "${BACKUP_LOCAL_NAME}" "${BACKUP_LOCAL_NAME_DAMAGED}"
+  exit 1;
 fi
 
 
