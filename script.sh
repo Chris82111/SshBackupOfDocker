@@ -47,6 +47,12 @@ while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
   --interactive )
     _interactive=true
     ;;
+  -r | --remove )
+    _remove=true
+    ;;
+  -l | --login )
+    _login=true
+    ;;
   -p | --password )
     shift; SERVER_KEY_PASSWORD_OVERWRITE=$1
     ;;
@@ -470,8 +476,6 @@ if [[ "true" == "$_t" ]] ; then
   exit ${ERROR}
 fi
 
-vecho "$_init"
-
 if [[ "true" == "$_init" ]] ; then
   RESULT=$(is_fingerprint_confirmation_required -i "${SERVER_KEY_FILE}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}")
   if [[ "ERROR" == "${RESULT}" ]] ; then
@@ -488,6 +492,13 @@ if [[ "true" == "$_init" ]] ; then
     exit 1
   fi
   
+  exit 1
+fi
+
+if [[ "true" == "$_remove" ]] ; then
+  dependent_program "ssh-keygen"
+  vecho "[${cyan}info${standout}] Removing the host key of ${SERVER_IP}."
+  ssh-keygen -R "${SERVER_IP}"  
   exit 1
 fi
 
@@ -537,11 +548,18 @@ else
   exit 1
 fi
 
+# -----------------------------------------------------------------------------
+# Performing special tasks
 
-#ssh -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}"
+if [[ "true" == "$_login" ]] ; then
+  vecho "[${cyan}info${standout}] Log into server."
+  ssh -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}"
+  exit 1
+fi
+
+# DEBUG! TODO:
 echo "end test"
 exit 1
-
 
 # -----------------------------------------------------------------------------
 #   Backup
