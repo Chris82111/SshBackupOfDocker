@@ -59,7 +59,7 @@ while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
 esac; shift; done
 
 function cleanup {
-  vecho "[${cyan}info${normal}] Cleanup"
+  vecho "Cleanup"
   shred -u "${TEMP_KEY}" 2> /dev/null
 }
 
@@ -91,11 +91,6 @@ fi
 #   Basic
 # -----------------------------------------------------------------------------
 
-# Change standard echo function
-function echo() { builtin echo -e "$@"; }
-
-function vecho() { if [[ "true" == "$_v" ]] ; then echo "$@"; fi ; }
-
 # check if stdout is a terminal
 if test -t 1; then
     # ANSI escape codes
@@ -112,6 +107,14 @@ if test -t 1; then
     white="\033[1;37m"
 fi
 
+# Change standard echo function
+function echo() { builtin echo -e "$@"; }
+
+function vecho() { if [[ "true" == "$_v" ]] ; then echo "[${cyan}info${normal}] $(date '+%H:%M:%S') $@"; fi ; }
+
+function lecho() { echo "$(date '+%H:%M:%S') $@"; }
+
+
 SCRIPT_NAME="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 
 
@@ -124,11 +127,11 @@ function dependent_program() {
     echo "[${red}fail${normal}] The $1 program must be installed."
     exit 1
   else 
-    vecho "[${cyan}info${normal}]   $1"
+    vecho "  $1"
   fi
 }
 
-vecho "[${cyan}info${normal}] Programs are installed:"
+vecho "Programs are installed:"
 dependent_program "jq"
 dependent_program "openssl"
 dependent_program "ssh"
@@ -347,7 +350,7 @@ function fingerprint_dialog() {
 
 CONFIG="config.json"
 
-vecho "[${cyan}info${normal}] Your config file is '${CONFIG}'."
+vecho "Your config file is '${CONFIG}'."
 if [[ ! -f "${CONFIG}" ]] ; then 
   echo "[${red}fail${normal}] A \"${CONFIG}\" config file is necessary."
   exit 1
@@ -385,6 +388,7 @@ BACKUP_NAME=""
   EVAL_COMMAND=$(jq -r " .backup.name " "${CONFIG}")
   BACKUP_NAME=$(eval echo $EVAL_COMMAND)
 
+
 # Extension of the archive file
 BACKUP_SERVER_EXTENSION=$(jq -r " .backup.server.extension " "${CONFIG}")
 
@@ -411,19 +415,19 @@ LOG_LOCAL=$(echo "${BACKUP_LOCAL_DESTINATIONFOLDER}/${BACKUP_NAME}.log" | tr -s 
 # -----------------------------------------------------------------------------
 # Validity check of the variables
 
-vecho "[${cyan}info${normal}] Your key file is '${SERVER_KEY_FILE}'."
+vecho "Your key file is '${SERVER_KEY_FILE}'."
 if [[ ! -f "${SERVER_KEY_FILE}" ]] ; then 
   echo "[${red}fail${normal}] A \"${SERVER_KEY_FILE}\" key file is necessary." 
   exit 1
 fi
 
 if [[ "" != "${SERVER_KEY_PASSWORD_OVERWRITE}" ]] ; then
-  vecho "[${cyan}info${normal}] Password has been passed and overwrites the one read."
+  vecho "Password has been passed and overwrites the one read."
   SERVER_KEY_PASSWORD="${SERVER_KEY_PASSWORD_OVERWRITE}"
 fi
 
 PERMISSION=$(stat -c "%a" "${SERVER_KEY_FILE}")
-vecho "[${cyan}info${normal}] Permissions is ${PERMISSION} for '${SERVER_KEY_FILE}'."
+vecho "Permissions is ${PERMISSION} for '${SERVER_KEY_FILE}'."
 if [[ "$EUID" -ne "0" ]]; then
   if [[ "${PERMISSION:1:2}" != "00" ]] ; then 
     echo "[${red}fail${normal}] Permissions ${PERMISSION} for '${SERVER_KEY_FILE}' are too open (group and other needs to be 0)."
@@ -497,7 +501,7 @@ fi
 
 if [[ "true" == "$_remove" ]] ; then
   dependent_program "ssh-keygen"
-  vecho "[${cyan}info${normal}] Removing the host key of ${SERVER_IP}."
+  vecho "Removing the host key of ${SERVER_IP}."
   ssh-keygen -R "${SERVER_IP}"  
   exit 1
 fi
@@ -509,7 +513,7 @@ fi
 
 # If the password is blank, you must enter it manually
 if [[ "" == "${SERVER_KEY_PASSWORD}" ]] ; then
-  vecho "[${cyan}info${normal}] Password not set."
+  vecho "Password not set."
   if [[ "true" == "$_interactive" ]] ; then
     read -sp "Enter passphrase for ${SERVER_KEY_FILE}:" SERVER_KEY_PASSWORD
     echo ""
@@ -523,7 +527,7 @@ if ! openssl rsa -noout -in "${SERVER_KEY_FILE}" -passin "pass:${SERVER_KEY_PASS
   echo "[${red}fail${normal}] The password is wrong."
   exit 1;
 else
-  vecho "[${cyan}info${normal}] Password correct."
+  vecho "Password correct."
 fi
 
 # File has 600 permission
@@ -541,7 +545,7 @@ elif [[ "FAIL" == "${RESULT_4CHARACTERS}" ]] ; then
   echo "[${red}fail${normal}] There is a connection problem."
   exit 1
 elif [[ "PASS" == "${RESULT_4CHARACTERS}" ]] ; then
-  vecho "[${cyan}info${normal}] You accepted the fingerprint."
+  vecho "You accepted the fingerprint."
   :;
 else
   echo "[${red}fail${normal}] This logical error should not occur."
@@ -552,14 +556,11 @@ fi
 # Performing special tasks
 
 if [[ "true" == "$_login" ]] ; then
-  vecho "[${cyan}info${normal}] Log into server."
+  vecho "Log into server."
   ssh -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}"
   exit 1
 fi
 
-# DEBUG! TODO:
-echo "end test"
-exit 1
 
 # -----------------------------------------------------------------------------
 #   Backup
@@ -569,10 +570,14 @@ exit 1
 REMOTE_COMMANDS=$(cat << END_REMOTE_COMMANDS
 
 #!/bin/bash
+function echo() { builtin echo -e "\$@"; }
+function vecho() { if [[ "true" == "$_v" ]] ; then echo "[${cyan}info${normal}] \$(date '+%H:%M:%S') \$@"; fi ; }
+function lecho() { echo "\$(date '+%H:%M:%S')  \$@"; }
 
-echo "Time: \$(date '+y%Ym%md%d %H:%M:%S')" > "${LOG_SERVER}"
+lecho "Time: \$(date '+y%Ym%md%d %H:%M:%S')" > "${LOG_SERVER}"
 
-echo "\$(date '+%H:%M:%S') Create dir" >> "${LOG_SERVER}"
+lecho "Create dir" >> "${LOG_SERVER}"
+
 mkdir -p "${BACKUP_SERVER_DESTINATIONFOLDER}"
 
 # Set to name or ID of the container to be watched.
@@ -581,12 +586,12 @@ CONTAINER=\$(docker ps --all | grep "${DOCKER_NAME}" | cut -f1 -d' ')
 # Define backup name
 [[ -z \${CONTAINER} ]] && CONTAINER="000000000000"
 
-echo "\$(date '+%H:%M:%S') Look for \${CONTAINER}" >> "${LOG_SERVER}"
+lecho "Look for \${CONTAINER}" >> "${LOG_SERVER}"
 
 # Stop script if backup name is used
 if [[ "\${CONTAINER}" = "000000000000" ]] ; then
-  echo "\$(date '+%H:%M:%S') Container not found, must be stopped"
-  echo "\$(date '+%H:%M:%S') Container not found, must be stopped" >> "${LOG_SERVER}"
+  vecho "Container not found, must be stopped"
+  lecho "Container not found, must be stopped" >> "${LOG_SERVER}"
   exit 2;
 else
 
@@ -597,26 +602,26 @@ else
 
   # Stop the container
   if [[ "\$( docker container inspect -f '{{.State.Running}}' \${CONTAINER} )" == "true" ]] ; then 
-    echo "\$(date '+%H:%M:%S') docker stop \${CONTAINER}"
-    echo "\$(date '+%H:%M:%S') docker stop \${CONTAINER}" >> "${LOG_SERVER}"
+    vecho "docker stop \${CONTAINER}"
+    lecho "docker stop \${CONTAINER}" >> "${LOG_SERVER}"
     docker stop \${CONTAINER}
   fi
 
   # This first echo is important for keeping the output clean and not overwriting the previous line of output.
-  echo "\$(date '+%H:%M:%S') Waiting for \${CONTAINER} to be ready (\${counter}/\${timeout})"
-  echo "\$(date '+%H:%M:%S') Waiting for \${CONTAINER} to be ready (\${counter}/\${timeout})" >> "${LOG_SERVER}"
+  vecho "Waiting for \${CONTAINER} to be ready (\${counter}/\${timeout})"
+  lecho "Waiting for \${CONTAINER} to be ready (\${counter}/\${timeout})" >> "${LOG_SERVER}"
 
   #This says that until docker inspect reports the container is in a running state, keep looping.
   until [[ "\$( docker container inspect -f '{{json .State.Running}}' \${CONTAINER} )" == "false" ]] ; do
 
-    # If we've reached the timeout period, report that and exit to prevent running an infinite loop.
+    # If we have reached the timeout period, report that and exit to prevent running an infinite loop.
     if [[ \${timeout} -lt \${counter} ]]; then
       echo "ERROR: Timed out waiting for \${CONTAINER} to come up."
       exit 3
     fi
 
     if (( \$counter % 5 == 0 )); then
-      echo -e "\e[1A\e[KWaiting for \${CONTAINER} to be ready (\${counter}/\${timeout})"
+      vecho "\e[1A\e[KWaiting for \${CONTAINER} to be ready (\${counter}/\${timeout})"
     fi
 
     sleep 1s
@@ -625,13 +630,14 @@ else
   done
 fi
 
-echo "\$(date '+%H:%M:%S') tar to: ${BACKUP_SERVER_NAME} from: ${BACKUP_SERVER_SOURCEFOLDER}"
-echo "\$(date '+%H:%M:%S') tar to: ${BACKUP_SERVER_NAME} from: ${BACKUP_SERVER_SOURCEFOLDER}" >> "${LOG_SERVER}"
+vecho "tar to: ${BACKUP_SERVER_NAME} from: ${BACKUP_SERVER_SOURCEFOLDER}"
+lecho "tar to: ${BACKUP_SERVER_NAME} from: ${BACKUP_SERVER_SOURCEFOLDER}" >> "${LOG_SERVER}"
 tar -czf "${BACKUP_SERVER_NAME}" "${BACKUP_SERVER_SOURCEFOLDER[@]}"
 
-echo "\$(date '+%H:%M:%S') Start docker \${CONTAINER}"
-echo "\$(date '+%H:%M:%S') Start docker \${CONTAINER}" >> "${LOG_SERVER}"
+vecho "Start docker \${CONTAINER}"
+lecho "Start docker \${CONTAINER}" >> "${LOG_SERVER}"
 docker start \${CONTAINER}
+
 
 END_REMOTE_COMMANDS
 )
@@ -639,50 +645,56 @@ END_REMOTE_COMMANDS
 
 # -----------------------------------------------------------------------------
 
-echo "$(date '+%H:%M:%S') Run remote commands section"
-echo "$(date '+%H:%M:%S') Run remote commands section" >> "${LOG_LOCAL}"
-ssh -i ${SERVER_KEY_FILE} -p ${SERVER_PORT} ${SERVER_USER}@${SERVER_IP} "${REMOTE_COMMANDS}"
+vecho "Run remote commands section"
+MSG01="Run remote commands section"
+ssh -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}" "${REMOTE_COMMANDS}"
 
 
 # -----------------------------------------------------------------------------
 
-echo "$(date '+%H:%M:%S') Download archive file"
-MSG1="$(date '+%H:%M:%S') Download archive file"
-rsync -chavzP --partial --progress --stats -e "ssh -i ${SERVER_KEY_FILE} -p ${SERVER_PORT}" ${SERVER_USER}@${SERVER_IP}:"${BACKUP_SERVER_NAME}" "${BACKUP_LOCAL_NAME}"
+vecho "Create folder '${BACKUP_LOCAL_DESTINATIONFOLDER}'"
+MSG02="Create folder '${BACKUP_LOCAL_DESTINATIONFOLDER}'"
+mkdir -p "${BACKUP_LOCAL_DESTINATIONFOLDER}"
+
+vecho "Download archive file"
+MSG03="Download archive file"
+rsync -chavzP --partial --progress --stats -e "ssh -i \"${TEMP_KEY}\" -p \"${SERVER_PORT}\"" "${SERVER_USER}@${SERVER_IP}:${BACKUP_SERVER_NAME}" "${BACKUP_LOCAL_NAME}"
 
 
-echo "$(date '+%H:%M:%S') Download log file"
-MSG2="$(date '+%H:%M:%S') Download log file"
-rsync -chavzP --partial --progress --stats -e "ssh -p ${SERVER_PORT}" ${SERVER_USER}@${SERVER_IP}:"${LOG_SERVER}" "${LOG_LOCAL}"
+vecho "Download log file"
+MSG04="Download log file"
+rsync -chavzP --partial --progress --stats -e "ssh -i \"${TEMP_KEY}\" -p \"${SERVER_PORT}\"" "${SERVER_USER}@${SERVER_IP}:${LOG_SERVER}" "${LOG_LOCAL}"
 
 
-echo "${MSG1}" >> "${LOG_LOCAL}"
-echo "${MSG2}" >> "${LOG_LOCAL}"
+lecho "${MSG01}" >> "${LOG_LOCAL}"
+lecho "${MSG02}" >> "${LOG_LOCAL}"
+lecho "${MSG03}" >> "${LOG_LOCAL}"
+lecho "${MSG04}" >> "${LOG_LOCAL}"
 
-echo "$(date '+%H:%M:%S') Data are copied"
-echo "$(date '+%H:%M:%S') Data are copied" >> "${LOG_LOCAL}"
-
-
-echo "$(date '+%H:%M:%S') Determine server sha256 checksum of"
-echo "$(date '+%H:%M:%S') Determine server sha256 checksum of" >> "${LOG_LOCAL}"
-var=($(ssh -i ${SERVER_KEY_FILE} -p ${SERVER_PORT} ${SERVER_USER}@${SERVER_IP} "sha256sum ${BACKUP_SERVER_NAME}"))
-echo "$(date '+%H:%M:%S') Server sha256 : ${var[0]}" >> "${LOG_LOCAL}"
+vecho "Data are copied"
+lecho "Data are copied" >> "${LOG_LOCAL}"
 
 
-echo "$(date '+%H:%M:%S') Determine local sha256 checksum"
-echo "$(date '+%H:%M:%S') Determine local sha256 checksum" >> "${LOG_LOCAL}"
-var2=($(sha256sum ${BACKUP_LOCAL_NAME}))
-echo "$(date '+%H:%M:%S') Local  sha256 : ${var2[0]}" >> "${LOG_LOCAL}"
+vecho "Determine server sha256 checksum of ${BACKUP_SERVER_NAME}"
+lecho "Determine server sha256 checksum of ${BACKUP_SERVER_NAME}" >> "${LOG_LOCAL}"
+SHA256_SERVER=($(ssh -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}" "sha256sum \"${BACKUP_SERVER_NAME}\""))
+lecho "Server sha256 : ${SHA256_SERVER[0]}" >> "${LOG_LOCAL}"
 
 
-if [[ "${var[0]}" == "${var2[0]}" ]] ; then
-  echo "$(date '+%H:%M:%S') Data are valid"
-  echo "$(date '+%H:%M:%S') Data are valid" >> "${LOG_LOCAL}"
+vecho "Determine local sha256 checksum of ${BACKUP_LOCAL_NAME}"
+lecho "Determine local sha256 checksum of ${BACKUP_LOCAL_NAME}" >> "${LOG_LOCAL}"
+SHA256_LOCAL=($(sha256sum "${BACKUP_LOCAL_NAME}"))
+lecho "Local  sha256 : ${SHA256_LOCAL[0]}" >> "${LOG_LOCAL}"
+
+
+if [[ "${SHA256_SERVER[0]}" == "${SHA256_LOCAL[0]}" ]] ; then
+  vecho "Data are valid"
+  lecho "Data are valid" >> "${LOG_LOCAL}"
   mv "${BACKUP_LOCAL_NAME}" "${BACKUP_LOCAL_NAME_VALID}"
-  ssh -i ${SERVER_KEY_FILE} -p ${SERVER_PORT} ${SERVER_USER}@${SERVER_IP} "rm ${BACKUP_SERVER_NAME} ; rm ${LOG_SERVER}"
+  ssh -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}" "rm ${BACKUP_SERVER_NAME} ; rm ${LOG_SERVER}"
 else
-  echo "$(date '+%H:%M:%S') Data damaged"
-  echo "$(date '+%H:%M:%S') Data damaged" >> "${LOG_LOCAL}"
+  vecho "Data damaged"
+  lecho "Data damaged" >> "${LOG_LOCAL}"
   mv "${BACKUP_LOCAL_NAME}" "${BACKUP_LOCAL_NAME_DAMAGED}"
 fi
 
