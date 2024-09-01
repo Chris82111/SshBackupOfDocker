@@ -85,9 +85,29 @@ if [[ "true" == "$_h" ]] ; then
   echo "             note that a password entered here is saved in the history."
   echo "             Use the config file (${CONFIG})."
   echo ""
-  echo "Set rights:  'chmod 600 example.file'"
-  echo "Set rights:  'chown root example.file'"
-  echo "Set rights:  'chgrp root example.file'"
+  echo "Set the rights of the config and script file:"
+  echo "  'chmod 600 example.file'"
+  echo "  'chown root example.file'"
+  echo "  'chgrp root example.file'"
+  echo ""
+  echo "Return values:"
+  echo "  0 OK"
+  echo "  1 Dependent program not available"
+  echo "  2 Config file not found."
+  echo "  3 Key file not found."
+  echo "  4 Permissions of key file of group and other needs to be 0."
+  echo "  5 Password does not match."
+  echo "  6 No password available."
+  echo "  7 There is a connection problem."
+  echo "  8 This logical error should not occur."
+  echo "  9 Unknown error."
+  echo " 10 You need to accept the fingerprint."
+  echo " 11 There is a connection problem."
+  echo " 12 This logical error should not occur."
+  echo " 13 Data damaged."
+  echo ""
+  echo "101 Server: Container not found, must be stopped."
+  echo "102 Server: Timed out waiting for container to come up."
   echo ""
   
   exit 0
@@ -360,7 +380,7 @@ CONFIG="config.json"
 vecho "Your config file is '${CONFIG}'."
 if [[ ! -f "${CONFIG}" ]] ; then 
   echo "[${red}fail${normal}] A \"${CONFIG}\" config file is necessary."
-  exit 1
+  exit 2
 fi
 
 # Name or IP of the server
@@ -425,7 +445,7 @@ LOG_LOCAL=$(echo "${BACKUP_LOCAL_DESTINATIONFOLDER}/${BACKUP_NAME}.log" | tr -s 
 vecho "Your key file is '${SERVER_KEY_FILE}'."
 if [[ ! -f "${SERVER_KEY_FILE}" ]] ; then 
   echo "[${red}fail${normal}] A \"${SERVER_KEY_FILE}\" key file is necessary." 
-  exit 1
+  exit 3
 fi
 
 if [[ "" != "${SERVER_KEY_PASSWORD_OVERWRITE}" ]] ; then
@@ -438,7 +458,7 @@ vecho "Permissions is ${PERMISSION} for '${SERVER_KEY_FILE}'."
 if [[ "$EUID" -ne "0" ]]; then
   if [[ "${PERMISSION:1:2}" != "00" ]] ; then 
     echo "[${red}fail${normal}] Permissions ${PERMISSION} for '${SERVER_KEY_FILE}' are too open (group and other needs to be 0)."
-    exit 1
+    exit 4
   fi
 fi
 
@@ -454,11 +474,11 @@ if [[ "true" == "$_t" ]] ; then
       echo "[${green}pass${normal}] Password matches"
     else
       echo "[${red}fail${normal}] Password does not match."
-      ERROR=1
+      ERROR=5
     fi
   else
     echo "[${red}fail${normal}] No password available."
-    ERROR=1
+    ERROR=6
   fi 
   
   RESULT=$(is_fingerprint_accepted -i "${SERVER_KEY_FILE}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}")
@@ -491,7 +511,7 @@ if [[ "true" == "$_init" ]] ; then
   RESULT=$(is_fingerprint_confirmation_required -i "${SERVER_KEY_FILE}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}")
   if [[ "ERROR" == "${RESULT}" ]] ; then
     echo "[${red}fail${normal}] There is a connection problem."
-    exit 1
+    exit 7
   elif [[ "YES" == "${RESULT}" ]] ; then
     fingerprint_dialog -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}"
     exit 0
@@ -500,17 +520,17 @@ if [[ "true" == "$_init" ]] ; then
     exit 0
   else
     echo "[${red}fail${normal}] This logical error should not occur."
-    exit 1
+    exit 8
   fi
   
-  exit 1
+  exit 9
 fi
 
 if [[ "true" == "$_remove" ]] ; then
   dependent_program "ssh-keygen"
   vecho "Removing the host key of ${SERVER_IP}."
   ssh-keygen -R "${SERVER_IP}"  
-  exit 1
+  exit 0
 fi
 
 if [[ "true" == "$_scan" ]] ; then
@@ -534,13 +554,13 @@ if [[ "" == "${SERVER_KEY_PASSWORD}" ]] ; then
     echo ""
   else
     echo "[${red}fail${normal}] No password available."
-    exit 1;
+    exit 6;
   fi
 fi
 
 if ! openssl rsa -noout -in "${SERVER_KEY_FILE}" -passin "pass:${SERVER_KEY_PASSWORD}" 2>/dev/null ; then
   echo "[${red}fail${normal}] The password is wrong."
-  exit 1;
+  exit 5;
 else
   vecho "Password correct."
 fi
@@ -555,16 +575,16 @@ RESULT_4CHARACTERS="${RESULT:0:4}"
 
 if [[ "FAIL-FINGERPRINT" == "${RESULT}" ]] ; then
   echo "[${red}fail${normal}] You need to accept the fingerprint"
-  exit 1
+  exit 10
 elif [[ "FAIL" == "${RESULT_4CHARACTERS}" ]] ; then
   echo "[${red}fail${normal}] There is a connection problem."
-  exit 1
+  exit 11
 elif [[ "PASS" == "${RESULT_4CHARACTERS}" ]] ; then
   vecho "You accepted the fingerprint."
   :;
 else
   echo "[${red}fail${normal}] This logical error should not occur."
-  exit 1
+  exit 12
 fi
 
 # -----------------------------------------------------------------------------
@@ -573,7 +593,7 @@ fi
 if [[ "true" == "$_login" ]] ; then
   vecho "Log into server."
   ssh -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}"
-  exit 1
+  exit 0
 fi
 
 
@@ -607,7 +627,7 @@ lecho "Look for \${CONTAINER}" >> "${LOG_SERVER}"
 if [[ "\${CONTAINER}" = "000000000000" ]] ; then
   vecho "Container not found, must be stopped"
   lecho "Container not found, must be stopped" >> "${LOG_SERVER}"
-  exit 2;
+  exit 101;
 else
 
   # Set timeout to the number of seconds you are willing to wait.
@@ -632,7 +652,7 @@ else
     # If we have reached the timeout period, report that and exit to prevent running an infinite loop.
     if [[ \${timeout} -lt \${counter} ]]; then
       echo "ERROR: Timed out waiting for \${CONTAINER} to come up."
-      exit 3
+      exit 102
     fi
 
     if (( \$counter % 5 == 0 )); then
@@ -653,6 +673,7 @@ vecho "Start docker \${CONTAINER}"
 lecho "Start docker \${CONTAINER}" >> "${LOG_SERVER}"
 docker start \${CONTAINER}
 
+exit 0
 
 END_REMOTE_COMMANDS
 )
@@ -663,6 +684,11 @@ END_REMOTE_COMMANDS
 vecho "Run remote commands section"
 MSG01="Run remote commands section"
 ssh -i "${TEMP_KEY}" -p "${SERVER_PORT}" "${SERVER_USER}@${SERVER_IP}" "${REMOTE_COMMANDS}"
+RETURN_VALUE="$?"
+
+if [[ "0" != "${RETURN_VALUE}" ]] ; then
+  exit ${RETURN_VALUE}
+fi
 
 
 # -----------------------------------------------------------------------------
@@ -712,7 +738,7 @@ else
   vecho "Data damaged"
   lecho "Data damaged" >> "${LOG_LOCAL}"
   mv "${BACKUP_LOCAL_NAME}" "${BACKUP_LOCAL_NAME_DAMAGED}"
-  exit 1;
+  exit 13;
 fi
 
 
