@@ -71,6 +71,8 @@ function cleanup {
 trap cleanup EXIT
 
 if [[ "true" == "$_h" ]] ; then
+  echo "The script creates a backup of folders on a server and saves the backup on the current server."
+  echo ""
   echo "usage: ${SCRIPT_NAME} [-h help] [-v verbose] [-t test] [init] [interactive] [-r remove] [-l login] [-s scan] [-p password]"
   echo ""
   echo "help:        Shows the help (this output)."
@@ -89,6 +91,8 @@ if [[ "true" == "$_h" ]] ; then
   echo "  'chmod 600 example.file'"
   echo "  'chown root example.file'"
   echo "  'chgrp root example.file'"
+  echo ""
+  echo "The script can be found on GitHub: https://github.com/Chris82111/SshBackupOfDocker"
   echo ""
   echo "Create a task in the Synology with the following content."
   echo "If it works, remove '-t' or replace it with '-v':"
