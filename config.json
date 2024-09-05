@@ -1,0 +1,27 @@
+{
+  "server": {
+    "ip": "<YOUR_SERVER_IP_ADDRESS>",
+    "user": "<YOUR_SERVER_USER>",
+    "port": <YOUR_SERVER_SSH_PORT>,
+    "key": {
+      "file": "<YOUR_PRIVATE_KEY_FILE>",
+      "password": "<YOUR_PRIVATE_KEY_FILE_PASSWORD>"
+	}
+  },
+  "docker": {
+    "name": "<YOUR_CONTAINER_NAME>"
+  },
+  "backup": {
+    "name": "<YOUR_BACKUP_NAME_EG_$(date '+y%Ym%md%dh%Hm%Ms%S')>",
+    "server": {
+      "sourceFolder": ["<YOUR_SERVER_FOLDERS_AS_ARRAY>"],
+      "destinationFolder": "<YOUR_SERVER_DIRECTORY_OF_THE_TAR_GZ_FILE>",
+      "extension": ".tar.gz"
+    },
+	"local": {
+      "destinationFolder": "<YOUR_LOCAL_FOLDER>",
+      "validPostfix": "-valid",
+      "damagePostfix": "-damaged"
+    }
+  }
+}
