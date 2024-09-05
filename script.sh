@@ -28,11 +28,42 @@
 
 
 # -----------------------------------------------------------------------------
+#   Basic
+# -----------------------------------------------------------------------------
+
+# check if stdout is a terminal
+if test -t 1; then
+    # ANSI escape codes
+    bold="\033[1m"
+    underline="\033[4m"
+    normal="\033[0m" 
+    black="\033[30m"
+    red="\033[31m"
+    green="\033[32m"
+    yellow="\033[0;33m"
+    blue="\033[34m"
+    magenta="\033[1;35m"
+    cyan="\033[36m"
+    white="\033[1;37m"
+fi
+
+# Change standard echo function
+function echo() { builtin echo -e "$@"; }
+
+function vecho() { if [[ "true" == "$_v" ]] ; then echo "[${cyan}info${normal}] $(date '+%H:%M:%S') $@"; fi ; }
+
+function lecho() { echo "$(date '+%H:%M:%S') $@"; }
+
+SCRIPT_NAME="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
+
+
+# -----------------------------------------------------------------------------
 #   Input parameters
 # -----------------------------------------------------------------------------
 
 cd "$(dirname "$0")"
 
+#while getopts abc:D: opt
 while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
   -h | --help )
     _h=true
@@ -61,6 +92,13 @@ while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
   -p | --password )
     shift; SERVER_KEY_PASSWORD_OVERWRITE=$1
     ;;
+  -- )
+    shift
+    break
+    ;;
+  *)
+	echo "[${red}fail${normal}] Not implemented: $1"
+    ;;
 esac; shift; done
 
 function cleanup {
@@ -70,86 +108,62 @@ function cleanup {
 
 trap cleanup EXIT
 
+
+# -----------------------------------------------------------------------------
+#   Help
+# -----------------------------------------------------------------------------
+
 if [[ "true" == "$_h" ]] ; then
-  echo "The script creates a backup of folders on a server and saves the backup on the current server."
-  echo ""
-  echo "usage: ${SCRIPT_NAME} [-h help] [-v verbose] [-t test] [init] [interactive] [-r remove] [-l login] [-s scan] [-p password]"
-  echo ""
-  echo "help:        Shows the help (this output)."
-  echo "verbose:     Detailed mode for displaying additional information."
-  echo "test:        To test the password and the fingerprint. Returns 0=No error/1=Error"
-  echo "init:        Accepts the fingerprint. Returns 0=No error/1=Error"
-  echo "interactive: If no password is set, you will be asked for the password."
-  echo "remove:      Removes the server's fingerprint from your computer."
-  echo "login:       Uses the data from the config file to log in to the server."
-  echo "scan:        Scan the server and determine the fingerprint."
-  echo "password:    Sets and overwrites the password of the private key,"
-  echo "             note that a password entered here is saved in the history."
-  echo "             Use the config file (${CONFIG})."
-  echo ""
-  echo "Set the rights of the config and script file:"
-  echo "  'chmod 600 example.file'"
-  echo "  'chown root example.file'"
-  echo "  'chgrp root example.file'"
-  echo ""
-  echo "The script can be found on GitHub: https://github.com/Chris82111/SshBackupOfDocker"
-  echo ""
-  echo "Create a task in the Synology with the following content."
-  echo "If it works, remove '-t' or replace it with '-v':"
-  echo "  /bin/bash -c \"/bin/bash '/volume1/folder/script.sh' '-t' > >(tee '/volume1/folder/log.log') RET_VAL=\$?; exit \$RET_VAL\" "
-  echo ""
-  echo "Return values:"
-  echo "  0 OK"
-  echo "  1 Dependent program not available"
-  echo "  2 Config file not found."
-  echo "  3 Key file not found."
-  echo "  4 Permissions of key file of group and other needs to be 0."
-  echo "  5 Password does not match."
-  echo "  6 No password available."
-  echo "  7 There is a connection problem."
-  echo "  8 This logical error should not occur."
-  echo "  9 Unknown error."
-  echo " 10 You need to accept the fingerprint."
-  echo " 11 There is a connection problem."
-  echo " 12 This logical error should not occur."
-  echo " 13 Data damaged."
-  echo ""
-  echo "101 Server: Container not found, must be stopped."
-  echo "102 Server: Timed out waiting for container to come up."
-  echo ""
+cat << HELP_SECTION
+  The script creates a backup of folders on a server and saves the backup on the current server.
   
+  usage: ./${SCRIPT_NAME} [-h help] [-v verbose] [-t test] [init] [interactive] [-r remove] [-l login] [-s scan] [-p password]
+  
+  help:        Shows the help (this output).
+  verbose:     Detailed mode for displaying additional information.
+  test:        To test the password and the fingerprint. Returns 0=No error/1=Error
+  init:        Accepts the fingerprint. Returns 0=No error/1=Error
+  interactive: If no password is set, you will be asked for the password.
+  remove:      Removes the server's fingerprint from your computer.
+  login:       Uses the data from the config file to log in to the server.
+  scan:        Scan the server and determine the fingerprint.
+  password:    Sets and overwrites the password of the private key,
+               note that a password entered here is saved in the history.
+               Use the config file.
+  
+  Set the rights of the config and script file:
+    'chmod 600 example.file'
+    'chown root example.file'
+    'chgrp root example.file'
+  
+  The script can be found on GitHub: https://github.com/Chris82111/SshBackupOfDocker
+  
+  Create a task in the Synology with the following content.
+  If it works, remove '-t' or replace it with '-v':
+    /bin/bash -c "/bin/bash '/volume1/folder/script.sh' '-t' > >(tee '/volume1/folder/log.log') RET_VAL=\$?; exit \$RET_VAL"
+  
+  Return values:
+    0 OK
+    1 Dependent program not available
+    2 Config file not found.
+    3 Key file not found.
+    4 Permissions of key file of group and other needs to be 0.
+    5 Password does not match.
+    6 No password available.
+    7 There is a connection problem.
+    8 This logical error should not occur.
+    9 Unknown error.
+   10 You need to accept the fingerprint.
+   11 There is a connection problem.
+   12 This logical error should not occur.
+   13 Data damaged.
+  
+  101 Server: Container not found, must be stopped.
+  102 Server: Timed out waiting for container to come up.
+  
+HELP_SECTION
   exit 0
 fi
-
-
-# -----------------------------------------------------------------------------
-#   Basic
-# -----------------------------------------------------------------------------
-
-# check if stdout is a terminal
-if test -t 1; then
-    # ANSI escape codes
-    bold="\033[1m"
-    underline="\033[4m"
-    normal="\033[0m" 
-    black="\033[30m"
-    red="\033[31m"
-    green="\033[32m"
-    yellow="\033[0;33m"
-    blue="\033[34m"
-    magenta="\033[1;35m"
-    cyan="\033[36m"
-    white="\033[1;37m"
-fi
-
-# Change standard echo function
-function echo() { builtin echo -e "$@"; }
-
-function vecho() { if [[ "true" == "$_v" ]] ; then echo "[${cyan}info${normal}] $(date '+%H:%M:%S') $@"; fi ; }
-
-function lecho() { echo "$(date '+%H:%M:%S') $@"; }
-
-SCRIPT_NAME="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 
 
 # -----------------------------------------------------------------------------
