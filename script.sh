@@ -28,97 +28,6 @@
 
 
 # -----------------------------------------------------------------------------
-#   Input parameters
-# -----------------------------------------------------------------------------
-
-cd "$(dirname "$0")"
-
-while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
-  -h | --help )
-    _h=true
-    ;;
-  -v | --verbose )
-    _v=true
-    ;;
-  -t | --test )
-    _t=true
-    ;;
-  --init )
-    _init=true
-    ;;
-  --interactive )
-    _interactive=true
-    ;;
-  -r | --remove )
-    _remove=true
-    ;;
-  -l | --login )
-    _login=true
-    ;;
-  -s | --scan )
-    _scan=true
-    ;;
-  -p | --password )
-    shift; SERVER_KEY_PASSWORD_OVERWRITE=$1
-    ;;
-esac; shift; done
-
-function cleanup {
-  vecho "Cleanup" 2> /dev/null
-  shred -u "${TEMP_KEY}" 2> /dev/null
-}
-
-trap cleanup EXIT
-
-if [[ "true" == "$_h" ]] ; then
-  echo "usage: ${SCRIPT_NAME} [-h help] [-v verbose] [-t test] [init] [interactive] [-r remove] [-l login] [-s scan] [-p password]"
-  echo ""
-  echo "help:        Shows the help (this output)."
-  echo "verbose:     Detailed mode for displaying additional information."
-  echo "test:        To test the password and the fingerprint. Returns 0=No error/1=Error"
-  echo "init:        Accepts the fingerprint. Returns 0=No error/1=Error"
-  echo "interactive: If no password is set, you will be asked for the password."
-  echo "remove:      Removes the server's fingerprint from your computer."
-  echo "login:       Uses the data from the config file to log in to the server."
-  echo "scan:        Scan the server and determine the fingerprint."
-  echo "password:    Sets and overwrites the password of the private key,"
-  echo "             note that a password entered here is saved in the history."
-  echo "             Use the config file (${CONFIG})."
-  echo ""
-  echo "Set the rights of the config and script file:"
-  echo "  'chmod 600 example.file'"
-  echo "  'chown root example.file'"
-  echo "  'chgrp root example.file'"
-  echo ""
-  echo "Create a task in the Synology with the following content."
-  echo "If it works, remove '-t' or replace it with '-v':"
-  echo "  /bin/bash -c \"/bin/bash '/volume1/folder/script.sh' '-t' > >(tee '/volume1/folder/log.log') RET_VAL=\$?; exit \$RET_VAL\" "
-  echo ""
-  echo "Return values:"
-  echo "  0 OK"
-  echo "  1 Dependent program not available"
-  echo "  2 Config file not found."
-  echo "  3 Key file not found."
-  echo "  4 Permissions of key file of group and other needs to be 0."
-  echo "  5 Password does not match."
-  echo "  6 No password available."
-  echo "  7 There is a connection problem."
-  echo "  8 This logical error should not occur."
-  echo "  9 Unknown error."
-  echo " 10 You need to accept the fingerprint."
-  echo " 11 There is a connection problem."
-  echo " 12 This logical error should not occur."
-  echo " 13 Data damaged."
-  echo ""
-  echo "101 Server: Container not found, must be stopped."
-  echo "102 Server: Timed out waiting for container to come up."
-  echo ""
-  
-  exit 0
-fi
-
-
-# -----------------------------------------------------------------------------
 #   Basic
 # -----------------------------------------------------------------------------
 
@@ -146,6 +55,114 @@ function vecho() { if [[ "true" == "$_v" ]] ; then echo "[${cyan}info${normal}] 
 function lecho() { echo "$(date '+%H:%M:%S') $@"; }
 
 SCRIPT_NAME="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
+
+
+# -----------------------------------------------------------------------------
+#   Input parameters
+# -----------------------------------------------------------------------------
+
+cd "$(dirname "$0")"
+
+while [[ "$1" =~ ^- ]]; do case $1 in
+  -h|--help)
+    _h=true
+    ;;
+  -v|--verbose)
+    _v=true
+    ;;
+  -t|--test)
+    _t=true
+    ;;
+  --init)
+    _init=true
+    ;;
+  --interactive)
+    _interactive=true
+    ;;
+  -r|--remove)
+    _remove=true
+    ;;
+  -l|--login)
+    _login=true
+    ;;
+  -s|--scan)
+    _scan=true
+    ;;
+  -p|--password)
+    shift; SERVER_KEY_PASSWORD_OVERWRITE=$1
+    ;;
+  --)
+    shift;
+    break
+    ;;
+  *)
+    echo "[${red}fail${normal}] Not implemented: $1"
+    ;;
+esac; shift; done
+
+function cleanup {
+  vecho "Cleanup" 2> /dev/null
+  shred -u "${TEMP_KEY}" 2> /dev/null
+}
+
+trap cleanup EXIT
+
+
+# -----------------------------------------------------------------------------
+#   Help
+# -----------------------------------------------------------------------------
+
+if [[ "true" == "$_h" ]] ; then
+cat << HELP_SECTION
+  The script creates a backup of folders on a server and saves the backup on the current server.
+  
+  usage: ./${SCRIPT_NAME} [-h help] [-v verbose] [-t test] [init] [interactive] [-r remove] [-l login] [-s scan] [-p password]
+  
+  help:        Shows the help (this output).
+  verbose:     Detailed mode for displaying additional information.
+  test:        To test the password and the fingerprint. Returns 0=No error/1=Error
+  init:        Accepts the fingerprint. Returns 0=No error/1=Error
+  interactive: If no password is set, you will be asked for the password.
+  remove:      Removes the server's fingerprint from your computer.
+  login:       Uses the data from the config file to log in to the server.
+  scan:        Scan the server and determine the fingerprint.
+  password:    Sets and overwrites the password of the private key,
+               note that a password entered here is saved in the history.
+               Use the config file.
+  
+  Set the rights of the config and script file:
+    'chmod 600 example.file'
+    'chown root example.file'
+    'chgrp root example.file'
+  
+  The script can be found on GitHub: https://github.com/Chris82111/SshBackupOfDocker
+  
+  Create a task in the Synology with the following content.
+  If it works, remove '-t' or replace it with '-v':
+    /bin/bash -c "/bin/bash '/volume1/folder/script.sh' '-t' > >(tee '/volume1/folder/log.log') RET_VAL=\$?; exit \$RET_VAL"
+  
+  Return values:
+    0 OK
+    1 Dependent program not available
+    2 Config file not found.
+    3 Key file not found.
+    4 Permissions of key file of group and other needs to be 0.
+    5 Password does not match.
+    6 No password available.
+    7 There is a connection problem.
+    8 This logical error should not occur.
+    9 Unknown error.
+   10 You need to accept the fingerprint.
+   11 There is a connection problem.
+   12 This logical error should not occur.
+   13 Data damaged.
+  
+  101 Server: Container not found, must be stopped.
+  102 Server: Timed out waiting for container to come up.
+  
+HELP_SECTION
+  exit 0
+fi
 
 
 # -----------------------------------------------------------------------------
@@ -202,18 +219,25 @@ function is_fingerprint_accepted() {
   local OUTPUT=""
   local RETURN_VALUE=255
   
-  while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
-    -i | --identity_file )
+  while [[ "$1" =~ ^- ]]; do case $1 in
+    -i|--identity_file)
       shift; KEYFILE="$1"
       ;;
-    -p | --port )
+    -p|--port)
       shift; PORT="$1"
       ;;
-    -u | --user )
+    -u|--user)
       shift; USER="$1"
       ;;
-    -h | --host )
+    -h|--host)
       shift; HOST="$1"
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "[${red}fail${normal}] Not implemented: $1"
       ;;
   esac; shift; done
   DESTINATION="$1"
@@ -296,18 +320,25 @@ function is_fingerprint_confirmation_required() {
   local DESTINATION=""
   local OUTPUT=""
   
-  while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
-    -i | --identity_file )
+  while [[ "$1" =~ ^- && ]]; do case $1 in
+    -i|--identity_file)
       shift; KEYFILE="$1"
       ;;
-    -p | --port )
+    -p|--port)
       shift; PORT="$1"
       ;;
-    -u | --user )
+    -u|--user)
       shift; USER="$1"
       ;;
-    -h | --host )
+    -h|--host)
       shift; HOST="$1"
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "[${red}fail${normal}] Not implemented: $1"
       ;;
   esac; shift; done
   DESTINATION="$1"
@@ -347,18 +378,25 @@ function fingerprint_dialog() {
   local HOST=""
   local DESTINATION=""
   
-  while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
-    -i | --identity_file )
+  while [[ "$1" =~ ^- ]]; do case $1 in
+    -i|--identity_file)
       shift; KEYFILE="$1"
       ;;
-    -p | --port )
+    -p|--port)
       shift; PORT="$1"
       ;;
-    -u | --user )
+    -u|--user)
       shift; USER="$1"
       ;;
-    -h | --host )
+    -h|--host)
       shift; HOST="$1"
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "[${red}fail${normal}] Not implemented: $1"
       ;;
   esac; shift; done
   DESTINATION="$1"
