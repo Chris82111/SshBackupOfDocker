@@ -63,41 +63,40 @@ SCRIPT_NAME="$(basename "$(test -L "$0" && readlink "$0" || echo "$0")")"
 
 cd "$(dirname "$0")"
 
-#while getopts abc:D: opt
-while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
-  -h | --help )
+while [[ "$1" =~ ^- ]]; do case $1 in
+  -h|--help)
     _h=true
     ;;
-  -v | --verbose )
+  -v|--verbose)
     _v=true
     ;;
-  -t | --test )
+  -t|--test)
     _t=true
     ;;
-  --init )
+  --init)
     _init=true
     ;;
-  --interactive )
+  --interactive)
     _interactive=true
     ;;
-  -r | --remove )
+  -r|--remove)
     _remove=true
     ;;
-  -l | --login )
+  -l|--login)
     _login=true
     ;;
-  -s | --scan )
+  -s|--scan)
     _scan=true
     ;;
-  -p | --password )
+  -p|--password)
     shift; SERVER_KEY_PASSWORD_OVERWRITE=$1
     ;;
-  -- )
-    shift
+  --)
+    shift;
     break
     ;;
   *)
-	echo "[${red}fail${normal}] Not implemented: $1"
+    echo "[${red}fail${normal}] Not implemented: $1"
     ;;
 esac; shift; done
 
@@ -220,18 +219,25 @@ function is_fingerprint_accepted() {
   local OUTPUT=""
   local RETURN_VALUE=255
   
-  while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
-    -i | --identity_file )
+  while [[ "$1" =~ ^- ]]; do case $1 in
+    -i|--identity_file)
       shift; KEYFILE="$1"
       ;;
-    -p | --port )
+    -p|--port)
       shift; PORT="$1"
       ;;
-    -u | --user )
+    -u|--user)
       shift; USER="$1"
       ;;
-    -h | --host )
+    -h|--host)
       shift; HOST="$1"
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "[${red}fail${normal}] Not implemented: $1"
       ;;
   esac; shift; done
   DESTINATION="$1"
@@ -314,18 +320,25 @@ function is_fingerprint_confirmation_required() {
   local DESTINATION=""
   local OUTPUT=""
   
-  while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
-    -i | --identity_file )
+  while [[ "$1" =~ ^- && ]]; do case $1 in
+    -i|--identity_file)
       shift; KEYFILE="$1"
       ;;
-    -p | --port )
+    -p|--port)
       shift; PORT="$1"
       ;;
-    -u | --user )
+    -u|--user)
       shift; USER="$1"
       ;;
-    -h | --host )
+    -h|--host)
       shift; HOST="$1"
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "[${red}fail${normal}] Not implemented: $1"
       ;;
   esac; shift; done
   DESTINATION="$1"
@@ -365,18 +378,25 @@ function fingerprint_dialog() {
   local HOST=""
   local DESTINATION=""
   
-  while [[ "$1" =~ ^- && ! "$1" == "--" ]]; do case $1 in
-    -i | --identity_file )
+  while [[ "$1" =~ ^- ]]; do case $1 in
+    -i|--identity_file)
       shift; KEYFILE="$1"
       ;;
-    -p | --port )
+    -p|--port)
       shift; PORT="$1"
       ;;
-    -u | --user )
+    -u|--user)
       shift; USER="$1"
       ;;
-    -h | --host )
+    -h|--host)
       shift; HOST="$1"
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "[${red}fail${normal}] Not implemented: $1"
       ;;
   esac; shift; done
   DESTINATION="$1"
